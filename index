@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#2563eb">
+<title>JK22402 车间速记</title>
+<style>
+:root{
+  --bg:#f1f5f9; --card:#fff; --line:#e2e8f0; --txt:#0f172a; --sub:#64748b;
+  --pri:#2563eb; --pri-d:#1d4ed8; --bad:#dc2626; --warn:#d97706; --ok:#059669;
+  --batch1:#7c3aed; --batch2:#0891b2; --batch3:#db2777; --batch4:#ea580c;
+  --batch5:#65a30d; --batch6:#0d9488; --batch7:#9333ea;
+  --safe-b:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;height:100%}
+body{
+  font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  background:var(--bg);color:var(--txt);font-size:15px;line-height:1.5;
+  display:flex;flex-direction:column;height:100dvh;overflow:hidden;
+}
+
+/* ===== 顶部 ===== */
+header{
+  background:#fff;border-bottom:1px solid var(--line);
+  padding:10px 14px;display:flex;flex-direction:column;gap:8px;
+  flex-shrink:0;z-index:20;
+}
+.head-row{display:flex;align-items:center;gap:10px}
+.head-row h1{font-size:15px;margin:0;font-weight:700;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.head-row input{
+  border:1px solid var(--line);border-radius:8px;padding:6px 10px;
+  font-size:13px;font-family:inherit;width:80px;outline:none;color:var(--txt);
+}
+.batch-bar{
+  display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;
+  scrollbar-width:none;
+}
+.batch-bar::-webkit-scrollbar{display:none}
+.chip{
+  flex-shrink:0;padding:6px 14px;border-radius:20px;font-size:13px;
+  border:1.5px solid var(--line);background:#fff;color:var(--sub);
+  font-family:inherit;cursor:pointer;transition:.15s;white-space:nowrap;
+}
+.chip.active{background:var(--pri);border-color:var(--pri);color:#fff;font-weight:600}
+.chip.b2.active{background:var(--batch2);border-color:var(--batch2)}
+.chip.b3.active{background:var(--batch3);border-color:var(--batch3)}
+
+/* ===== 中间记录区 ===== */
+.records-wrap{flex:1;overflow-y:auto;padding:12px 12px 8px;-webkit-overflow-scrolling:touch}
+.records-wrap::-webkit-scrollbar{width:0}
+.stats{
+  display:flex;gap:12px;font-size:11px;color:var(--sub);
+  padding:0 4px 10px;flex-wrap:wrap;align-items:center;
+}
+.stats b{color:var(--txt);font-size:14px}
+.stats .dot{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:3px}
+
+.day-divider{
+  display:flex;align-items:center;gap:8px;margin:14px 0 8px;
+  font-size:12px;color:var(--sub);font-weight:600;
+}
+.day-divider::before,.day-divider::after{content:'';flex:1;height:1px;background:var(--line)}
+
+.rec{
+  background:#fff;border-radius:12px;padding:10px 12px;margin-bottom:8px;
+  box-shadow:0 1px 3px rgba(15,23,42,.06);border-left:4px solid var(--pri);
+  position:relative;
+}
+.rec.bad{border-left-color:var(--bad);background:#fef2f2}
+.rec.b1{border-left-color:var(--batch1)}
+.rec.b2{border-left-color:var(--batch2)}
+.rec.b3{border-left-color:var(--batch3)}
+.rec.b4{border-left-color:var(--batch4)}
+.rec.b5{border-left-color:var(--batch5)}
+.rec.b6{border-left-color:var(--batch6)}
+.rec.b7{border-left-color:var(--batch7)}
+.rec-head{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:11px;color:var(--sub)}
+.rec-head .t{font-family:ui-monospace,Menlo,monospace;color:var(--txt);font-weight:700;font-size:13px}
+.tag{padding:2px 8px;border-radius:20px;font-size:10.5px;border:1px solid transparent;font-weight:500}
+.tag.step{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}
+.tag.batch{background:#f3e8ff;color:#6b21a8;border-color:#e9d5ff;font-weight:700}
+.tag.cat{background:#f1f5f9;color:#475569;border-color:#e2e8f0}
+.tag.cat.bad{background:#fee2e2;color:#b91c1c;border-color:#fecaca}
+.tag.cat.sm{background:#ecfdf5;color:#047857;border-color:#a7f3d0}
+.tag.cat.pm{background:#fffbeb;color:#b45309;border-color:#fde68a}
+.rec-body{margin:6px 0 0;font-size:14px;line-height:1.55;word-break:break-word}
+.rec-params{margin:6px 0 0;display:flex;gap:5px;flex-wrap:wrap}
+.p{font-size:10.5px;padding:2px 7px;border-radius:6px;font-family:ui-monospace,monospace}
+.p.ok{background:#ecfdf5;color:#047857}
+.p.warn{background:#fef3c7;color:#b45309;font-weight:700}
+.rec-ops{
+  display:flex;gap:4px;margin-top:8px;padding-top:8px;
+  border-top:1px dashed var(--line);
+}
+.rec-ops button{
+  flex:1;padding:6px;font-size:12px;border:1px solid var(--line);
+  background:#fff;border-radius:6px;color:var(--sub);font-family:inherit;
+}
+.empty{color:var(--sub);font-size:13px;text-align:center;padding:40px 20px;line-height:1.8}
+.empty .big{font-size:32px;display:block;margin-bottom:8px;opacity:.5}
+
+/* ===== 底部输入区 ===== */
+footer{
+  background:#fff;border-top:1px solid var(--line);
+  padding:10px 12px calc(10px + var(--safe-b));
+  flex-shrink:0;z-index:20;
+}
+#interim{
+  min-height:18px;font-size:12px;color:var(--sub);padding:0 4px 8px;
+  line-height:1.4;word-break:break-word;
+}
+#interim.live{color:var(--pri);font-weight:500}
+.input-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+#manualInput{
+  flex:1;border:1px solid var(--line);border-radius:10px;
+  padding:10px 12px;font-size:14px;font-family:inherit;outline:none;
+  color:var(--txt);background:#f8fafc;
+}
+#manualInput:focus{border-color:var(--pri);background:#fff}
+.btn-send{
+  padding:10px 16px;border-radius:10px;border:none;background:var(--pri);
+  color:#fff;font-size:14px;font-family:inherit;font-weight:600;
+}
+.mic-row{display:flex;gap:8px}
+#btnMic{
+  flex:1;padding:16px;border-radius:14px;border:none;background:var(--pri);
+  color:#fff;font-size:17px;font-weight:700;font-family:inherit;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  box-shadow:0 4px 14px rgba(37,99,235,.3);transition:.15s;
+}
+#btnMic:active{transform:scale(.97)}
+#btnMic.on{
+  background:var(--bad);box-shadow:0 4px 14px rgba(220,38,38,.4);
+  animation:pulse 1.4s infinite;
+}
+@keyframes pulse{
+  0%,100%{box-shadow:0 4px 14px rgba(220,38,38,.4)}
+  50%{box-shadow:0 4px 22px rgba(220,38,38,.7)}
+}
+#btnStop{
+  padding:16px 20px;border-radius:14px;border:1.5px solid var(--line);
+  background:#fff;font-size:15px;font-family:inherit;color:var(--sub);
+}
+#btnStop:disabled{opacity:.35}
+
+/* ===== 报告弹层 ===== */
+.modal{
+  position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:100;
+  display:none;flex-direction:column;padding-top:40px;
+}
+.modal.show{display:flex}
+.modal-box{
+  background:#fff;border-radius:16px 16px 0 0;flex:1;
+  display:flex;flex-direction:column;overflow:hidden;
+}
+.modal-head{
+  padding:14px 16px;border-bottom:1px solid var(--line);
+  display:flex;align-items:center;gap:8px;
+}
+.modal-head h2{margin:0;font-size:15px;font-weight:700;flex:1}
+.modal-head button{
+  padding:7px 12px;border-radius:8px;border:1px solid var(--line);
+  background:#fff;font-size:13px;font-family:inherit;color:var(--txt);
+}
+.modal-head button.pri{background:var(--pri);border-color:var(--pri);color:#fff}
+#report{
+  flex:1;overflow:auto;padding:16px;margin:0;
+  font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;
+  line-height:1.65;white-space:pre-wrap;word-break:break-word;
+  background:#0f172a;color:#e2e8f0;-webkit-overflow-scrolling:touch;
+}
+.fab{
+  position:fixed;right:14px;bottom:calc(140px + var(--safe-b));
+  width:48px;height:48px;border-radius:50%;background:#fff;
+  border:1px solid var(--line);box-shadow:0 4px 14px rgba(15,23,42,.12);
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;z-index:30;cursor:pointer;
+}
+.toast{
+  position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+  background:rgba(15,23,42,.92);color:#fff;padding:12px 20px;
+  border-radius:10px;font-size:14px;z-index:200;opacity:0;
+  transition:.25s;pointer-events:none;max-width:80vw;text-align:center;
+}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="head-row">
+    <h1>JK22402 车间速记</h1>
+    <input type="text" id="recorder" placeholder="记录人" maxlength="10">
+  </div>
+  <div class="batch-bar" id="batchBar">
+    <!-- 批次 chip 由 JS 生成 -->
+  </div>
+</header>
+
+<div class="records-wrap" id="recordsWrap">
+  <div class="stats" id="stats"></div>
+  <div id="records"></div>
+</div>
+
+<div class="fab" id="btnFab" title="生成报告">📋</div>
+
+<footer>
+  <div id="interim">点击下方按钮开始口述记录</div>
+  <div class="input-row">
+    <input type="text" id="manualInput" placeholder="也可打字，回车录入…">
+    <button class="btn-send" id="btnSend">录入</button>
+  </div>
+  <div class="mic-row">
+    <button id="btnMic">🎤 点击开始口述</button>
+    <button id="btnStop" disabled>■ 停止</button>
+  </div>
+</footer>
+
+<!-- 报告弹层 -->
+<div class="modal" id="reportModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2>精炼报告</h2>
+      <button id="btnCopy">复制</button>
+      <button id="btnDownload">下载</button>
+      <button class="pri" id="btnCloseModal">关闭</button>
+    </div>
+    <pre id="report"></pre>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================================================
+   配置区
+   ========================================================= */
+const BATCHES = [
+  { id:'批次一', label:'批次一', cls:'b1' },
+  { id:'批次二（放大批）', label:'批次二', cls:'b2', alias:['批次二','放大批','第二批'] },
+  { id:'批次三', label:'批次三', cls:'b3' },
+  { id:'批次四', label:'批次四', cls:'b4' },
+  { id:'批次五', label:'批次五', cls:'b5' },
+  { id:'批次六', label:'批次六', cls:'b6' },
+  { id:'批次七', label:'批次七', cls:'b7' }
+];
+
+const STEPS = [
+  { name:'称量',         kw:['称量','称取','称重','备料','领料','天平','台秤'] },
+  { name:'过筛1',        kw:['过筛1','过筛一','一次过筛','第一次过筛'] },
+  { name:'预混',         kw:['预混','预混合'] },
+  { name:'干法制粒',     kw:['干法制粒','制粒','压辊','液压','辊压','造粒','片材','喂料','整粒'] },
+  { name:'外加辅料称量', kw:['外加辅料','辅料称量','折算','外加称量'] },
+  { name:'混合1',        kw:['混合1','混合一','第一次混合'] },
+  { name:'过筛2',        kw:['过筛2','过筛二','二次过筛','第二次过筛'] },
+  { name:'混合2',        kw:['混合2','混合二','第二次混合'] },
+  { name:'总混',         kw:['总混','总混合','终混','硬脂酸镁'] },
+  { name:'压片',         kw:['压片','片重','冲模','转台','主压','预压','硬度','脆碎','崩解','粘冲','素片'] },
+  { name:'内包装',       kw:['内包装','内包','泡罩','铝塑','热封','密封性'] },
+  { name:'外包装',       kw:['外包装','外包','装盒','纸盒','小盒','贴标','说明书'] }
+];
+const STEP_NAMES = STEPS.map(s=>s.name);
+
+const ABNORMAL_KW = ['破损','异常','偏差','不合格','超标','异响','报警','停机','泄漏','漏粉','漏料',
+  '粘冲','卡料','堵塞','返工','报废','偏离','故障','中断','暂停','污染','超出范围','不符合','掉粉'];
+const SAMPLE_KW = ['取样','抽样','送检','样品','检测','检验','送样'];
+
+const PARAM_RULES = [
+  { key:'液压',      unit:'bar', min:50,   max:110, re:/(?:液压|油压|系统压力)[^\d]{0,8}(\d+(?:\.\d+)?)/gi, g:1, range:'50~110bar' },
+  { key:'压辊单元',  unit:'rpm', min:6,    max:12,  re:/(?:压辊单元|压辊转速|辊压速度)[^\d]{0,8}(\d+(?:\.\d+)?)/gi, g:1, range:'6.0~12.0rpm' },
+  { key:'压辊间距',  unit:'mm',  min:1.0,  max:2.0, re:/(?:压辊间距|辊间距)[^\d]{0,8}(\d+(?:\.\d+)?)/gi, g:1, range:'1.0~2.0mm' },
+  { key:'二级造粒',  unit:'rpm', min:50,   max:100, re:/(?:二级造粒|二级制粒)[^\d]{0,8}(\d+(?:\.\d+)?)/gi, g:1, range:'50~100rpm' },
+  { key:'转台转速',  unit:'rpm', min:20,   max:30,  re:/(?:转台转速|转台速度|转台)[^\d]{0,8}(\d+(?:\.\d+)?)/gi, g:1, range:'20~30rpm' },
+  { key:'硬度',      unit:'N',   min:50,   max:130, re:/(\d+(?:\.\d+)?)\s*N(?![a-zA-Z])/g, g:1, range:'50~130N' },
+  { key:'片重',      unit:'mg',  min:712.5,max:787.5, re:/(?:片重|平均片重)[^\d]{0,8}(\d+(?:\.\d+)?)/gi, g:1, range:'750mg±5%' },
+  { key:'热封温度',  unit:'℃',  min:170,  max:220, re:/(?:热封温度|热封)[^\d]{0,8}(\d+(?:\.\d+)?)/gi, g:1, range:'170~220℃' },
+  { key:'热封压力',  unit:'bar', min:4,    max:8,   re:/(?:热封压力)[^\d]{0,8}(\d+(?:\.\d+)?)/gi, g:1, range:'4~8bar' },
+  { key:'环境温度',  unit:'℃',  min:15,   max:25,  re:/(?:环境温度|室温|洁净区温度)[^\d]{0,8}(\d+(?:\.\d+)?)/gi, g:1, range:'15~25℃' },
+  { key:'相对湿度',  unit:'%RH', min:30,   max:65,  re:/(?:相对湿度|湿度)[^\d]{0,8}(\d+(?:\.\d+)?)/gi, g:1, range:'30~65%RH' }
+];
+
+/* =========================================================
+   状态
+   ========================================================= */
+const LS_KEY = 'jk22402_records_v1';
+const LS_SET = 'jk22402_settings_v1';
+
+let records = [];
+let currentBatch = '批次一';
+let recog = null, recording = false;
+let pendingText = '', pendingTimer = null;
+
+const $ = s => document.querySelector(s);
+
+/* =========================================================
+   持久化
+   ========================================================= */
+function save(){
+  try{
+    localStorage.setItem(LS_KEY, JSON.stringify(records));
+    localStorage.setItem(LS_SET, JSON.stringify({
+      currentBatch,
+      recorder: $('#recorder').value
+    }));
+  }catch(e){ console.warn('保存失败', e); }
+}
+function load(){
+  try{
+    const r = localStorage.getItem(LS_KEY);
+    if(r) records = JSON.parse(r).map(x=>({...x, time:new Date(x.time)}));
+    const s = localStorage.getItem(LS_SET);
+    if(s){
+      const st = JSON.parse(s);
+      if(st.currentBatch) currentBatch = st.currentBatch;
+      if(st.recorder) $('#recorder').value = st.recorder;
+    }
+  }catch(e){ console.warn('读取失败', e); }
+}
+
+/* =========================================================
+   工具函数
+   ========================================================= */
+function pad(n){ return String(n).padStart(2,'0'); }
+function fmtHM(d){ return pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+function fmtYMD(d){ return d.getFullYear() + '.' + pad(d.getMonth()+1) + '.' + pad(d.getDate()); }
+function fmtFull(d){ return fmtYMD(d) + ' ' + fmtHM(d); }
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function sameDay(a,b){ return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
+function toast(msg){
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._t); t._t = setTimeout(()=>t.classList.remove('show'), 1600);
+}
+function vibrate(ms=15){ if(navigator.vibrate) navigator.vibrate(ms); }
+
+/* =========================================================
+   时间解析（支持昨天/前天/今早等相对时间）
+   ========================================================= */
+function parseTime(text, base){
+  const d = new Date(base.getTime());
+  let cleaned = text, matched = '', h = null, mi = 0;
+  let dayOffset = 0;
+
+  // 相对日期
+  if(/前天/.test(cleaned)){ dayOffset = -2; cleaned = cleaned.replace(/前天/g,''); }
+  else if(/昨天|昨晚|昨日/.test(cleaned)){ dayOffset = -1; cleaned = cleaned.replace(/昨天|昨晚|昨日/g,''); }
+  else if(/今天|今日/.test(cleaned)){ dayOffset = 0; cleaned = cleaned.replace(/今天|今日/g,''); }
+  else if(/明天|明日/.test(cleaned)){ dayOffset = 1; cleaned = cleaned.replace(/明天|明日/g,''); }
+
+  // 完整日期
+  const dm = cleaned.match(/(\d{4})\s*[年.\-\/]\s*(\d{1,2})\s*[月.\-\/]\s*(\d{1,2})\s*日?/);
+  if(dm){
+    d.setFullYear(+dm[1], +dm[2]-1, +dm[3]);
+    cleaned = cleaned.replace(dm[0], '');
+  } else if(dayOffset !== 0){
+    d.setDate(d.getDate() + dayOffset);
+  }
+
+  // 时段 + 时间
+  let m = cleaned.match(/(凌晨|清晨|早上|早晨|上午|中午|下午|傍晚|晚上|夜里|夜间)\s*(\d{1,2})\s*[点时]\s*(\d{1,2})?\s*分?/);
+  if(m){
+    matched = m[0]; h = +m[2]; mi = m[3] ? +m[3] : 0;
+    const ap = m[1];
+    if(/下午|傍晚|晚上|夜里|夜间/.test(ap) && h < 12) h += 12;
+    if(/中午/.test(ap) && h < 12) h += 12;
+    if(/凌晨|清晨|早上|早晨|上午/.test(ap) && h === 12) h = 0;
+  } else {
+    // 10:10
+    m = cleaned.match(/(\d{1,2})\s*[:：]\s*(\d{1,2})/);
+    if(m){ matched = m[0]; h = +m[1]; mi = +m[2]; }
+    else {
+      // 10点10分
+      m = cleaned.match(/(\d{1,2})\s*[点时]\s*(\d{1,2})\s*分/);
+      if(m){ matched = m[0]; h = +m[1]; mi = +m[2]; }
+      else {
+        // 10点半
+        m = cleaned.match(/(\d{1,2})\s*[点时]\s*半/);
+        if(m){ matched = m[0]; h = +m[1]; mi = 30; }
+        else {
+          // 10点
+          m = cleaned.match(/(\d{1,2})\s*[点时](?!\d)/);
+          if(m){ matched = m[0]; h = +m[1]; mi = 0; }
+        }
+      }
+    }
+  }
+  if(matched && h !== null && h >= 0 && h < 24 && mi >= 0 && mi < 60){
+    d.setHours(h, mi, 0, 0);
+    cleaned = cleaned.replace(matched, '');
+  } else if(dayOffset !== 0){
+    // 只说了"昨天"没说时间，保留当前时间但日期改
+  }
+  cleaned = cleaned.replace(/^[\s，,、。；;：:\-—～~]+/, '').trim();
+  return { date: d, cleaned: cleaned || text };
+}
+
+/* =========================================================
+   批次识别
+   ========================================================= */
+const CN_NUM = {'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10};
+
+function normBatchName(numStr){
+  let n;
+  if(/^\d+$/.test(numStr)) n = parseInt(numStr,10);
+  else if(CN_NUM[numStr] !== undefined) n = CN_NUM[numStr];
+  else return null;
+  if(n >= 1 && n <= 7){
+    return BATCHES[n-1].id;
+  }
+  return null;
+}
+
+function extractBatchInfo(text){
+  // 匹配：第一批、第1批、批次一、批次1、批号一、批号1、一批（简说）
+  const regex = /(?:第\s*([一二三四五六七八九十\d]+)\s*批|批次\s*([一二三四五六七八九十\d]+)|批号\s*([一二三四五六七八九十\d]+))/g;
+  let matches = [];
+  let m;
+  while((m = regex.exec(text)) !== null){
+    const num = m[1] || m[2] || m[3];
+    const batch = normBatchName(num);
+    if(batch) matches.push({ index:m.index, length:m[0].length, batch });
+  }
+  // 别名匹配（放大批）
+  BATCHES.forEach(b=>{
+    if(b.alias){
+      b.alias.forEach(a=>{
+        let idx = text.indexOf(a);
+        while(idx >= 0){
+          // 避免与已匹配区域重复
+          const overlap = matches.some(x=>idx < x.index+x.length && idx+a.length > x.index);
+          if(!overlap) matches.push({ index:idx, length:a.length, batch:b.id });
+          idx = text.indexOf(a, idx+1);
+        }
+      });
+    }
+  });
+  matches.sort((a,b)=>a.index - b.index);
+
+  if(matches.length === 0){
+    return [{ batch: null, content: text }];
+  }
+  const result = [];
+  if(matches[0].index > 0){
+    const prefix = text.slice(0, matches[0].index).trim().replace(/^[\s，,、。；;：:\-—～~]+/, '');
+    if(prefix) result.push({ batch:null, content:prefix });
+  }
+  for(let i=0;i<matches.length;i++){
+    const start = matches[i].index + matches[i].length;
+    const end = (i+1 < matches.length) ? matches[i+1].index : text.length;
+    let content = text.slice(start, end).trim().replace(/^[\s，,、。；;：:\-—～~]+/, '');
+    if(content) result.push({ batch: matches[i].batch, content });
+  }
+  if(result.length === 0){
+    return [{ batch: matches[0].batch, content: text }];
+  }
+  return result;
+}
+
+/* =========================================================
+   文本解析
+   ========================================================= */
+function detectStep(text){
+  let best = '其他', bestScore = 0;
+  for(const s of STEPS){
+    for(const k of s.kw){
+      if(text.includes(k) && k.length > bestScore){
+        bestScore = k.length; best = s.name;
+      }
+    }
+  }
+  return best;
+}
+
+function extractParams(text){
+  const out = [];
+  for(const rule of PARAM_RULES){
+    rule.re.lastIndex = 0;
+    let m;
+    while((m = rule.re.exec(text)) !== null){
+      const val = parseFloat(m[rule.g || 1]);
+      if(isNaN(val)) continue;
+      out.push({
+        key: rule.key, value: val, unit: rule.unit, range: rule.range,
+        ok: val >= rule.min && val <= rule.max
+      });
+      if(!rule.re.global) break;
+      if(rule.re.lastIndex === m.index) rule.re.lastIndex++;
+    }
+  }
+  return out;
+}
+
+function detectCategory(text, params){
+  if(ABNORMAL_KW.some(k=>text.includes(k))) return '偏差/异常';
+  if(SAMPLE_KW.some(k=>text.includes(k))) return '取样/检测';
+  if(params.length || /rpm|bar|mm|℃|°C|\d+\s*N/i.test(text)) return '参数/操作条件';
+  return '操作记录';
+}
+
+/* =========================================================
+   核心：多批次拆条 + 时间逻辑
+   ========================================================= */
+function addRecord(rawText){
+  const now = new Date();
+  // 步骤1：按标点拆句
+  const sentences = rawText
+    .split(/[，,。；;！!？?\n]+/)
+    .map(s=>s.trim())
+    .filter(Boolean);
+  if(sentences.length === 0) return;
+
+  // 步骤2：逐句解析
+  let lastBatch = null;
+  let lastTime = now;
+  const parsedItems = [];
+
+  sentences.forEach((sentence, idx)=>{
+    // 识别批次
+    const batchInfos = extractBatchInfo(sentence);
+    batchInfos.forEach(info=>{
+      const content = info.content || sentence;
+      // 识别时间
+      const parsed = parseTime(content, lastTime);
+      const batch = info.batch || lastBatch || currentBatch;
+      // 若未识别到时间，使用上一个时间 + 1秒（保证顺序）
+      let eventTime = parsed.date;
+      if(!parsed.cleaned || parsed.cleaned === content){
+        // 没有时间信息
+        if(idx === 0 && batchInfos.length === 1){
+          eventTime = now;
+        } else {
+          eventTime = new Date(lastTime.getTime() + 1000);
+        }
+      }
+      parsedItems.push({
+        batch,
+        eventTime,
+        text: parsed.cleaned || content
+      });
+      lastBatch = batch;
+      lastTime = eventTime;
+    });
+  });
+
+  // 步骤3：生成记录
+  parsedItems.forEach((item, i)=>{
+    const text = item.text.trim();
+    if(!text) return;
+    const step = detectStep(text);
+    const params = extractParams(text);
+    const category = detectCategory(text, params);
+    records.push({
+      id: 'r' + Date.now() + Math.random().toString(36).slice(2,7) + i,
+      time: item.eventTime,
+      timeText: fmtHM(item.eventTime),
+      dateText: fmtYMD(item.eventTime),
+      batch: item.batch,
+      step, category, text, params,
+      createdAt: new Date().toISOString()
+    });
+  });
+
+  save();
+  render();
+}
+
+/* =========================================================
+   渲染
+   ========================================================= */
+function batchClass(batch){
+  const b = BATCHES.find(x=>x.id === batch);
+  return b ? b.cls : '';
+}
+
+function render(){
+  const wrap = $('#records');
+  const sorted = [...records].sort((a,b)=>a.time - b.time);
+
+  if(!sorted.length){
+    wrap.innerHTML = '<div class="empty"><span class="big">🎙️</span>还没有记录<br>点击下方按钮开始口述</div>';
+  } else {
+    let html = '';
+    let lastDay = '';
+    sorted.forEach(r=>{
+      const dayKey = r.dateText;
+      if(dayKey !== lastDay){
+        html += `<div class="day-divider">${dayKey}</div>`;
+        lastDay = dayKey;
+      }
+      const catCls = r.category === '偏差/异常' ? 'bad'
+                   : r.category === '取样/检测' ? 'sm'
+                   : r.category === '参数/操作条件' ? 'pm' : '';
+      const bCls = batchClass(r.batch);
+      const paramsHtml = r.params.length
+        ? `<div class="rec-params">${r.params.map(p=>
+            `<span class="p ${p.ok?'ok':'warn'}">${p.key} ${p.value}${p.unit} ${p.ok?'✓':'⚠'}</span>`
+          ).join('')}</div>` : '';
+      html += `<div class="rec ${r.category==='偏差/异常'?'bad':''} ${bCls}" data-id="${r.id}">
+        <div class="rec-head">
+          <span class="t">${r.timeText}</span>
+          <span class="tag batch">${escapeHtml(r.batch)}</span>
+          <span class="tag step">${r.step}</span>
+          <span class="tag cat ${catCls}">${r.category}</span>
+        </div>
+        <div class="rec-body">${escapeHtml(r.text)}</div>
+        ${paramsHtml}
+        <div class="rec-ops">
+          <button data-act="edit">编辑</button>
+          <button data-act="batch">改批次</button>
+          <button data-act="del">删除</button>
+        </div>
+      </div>`;
+    });
+    wrap.innerHTML = html;
+  }
+
+  // 统计
+  const batches = new Set(records.map(r=>r.batch));
+  const steps = new Set(records.map(r=>r.step).filter(s=>STEP_NAMES.includes(s)));
+  $('#stats').innerHTML = `
+    <span><b>${records.length}</b> 条</span>
+    <span><b style="color:var(--bad)">${records.filter(r=>r.category==='偏差/异常').length}</b> 偏差</span>
+    <span><b>${batches.size}</b> 批次</span>
+    <span><b>${steps.size}</b>/12 工序</span>
+  `;
+}
+
+/* =========================================================
+   记录操作
+   ========================================================= */
+$('#records').addEventListener('click', e=>{
+  const btn = e.target.closest('button[data-act]');
+  if(!btn) return;
+  const card = btn.closest('.rec[data-id]');
+  const idx = records.findIndex(r=>r.id === card.dataset.id);
+  if(idx < 0) return;
+  const cur = records[idx];
+  if(btn.dataset.act === 'del'){
+    if(confirm('删除这条记录？\n' + cur.text)){
+      records.splice(idx,1); save(); render(); vibrate();
+    }
+  } else if(btn.dataset.act === 'edit'){
+    const nt = prompt('修改内容：', cur.text);
+    if(nt === null) return;
+    const params = extractParams(nt);
+    cur.text = nt.trim();
+    cur.step = detectStep(cur.text);
+    cur.category = detectCategory(cur.text, params);
+    cur.params = params;
+    save(); render();
+  } else if(btn.dataset.act === 'batch'){
+    const opts = BATCHES.map((b,i)=>`${i+1}. ${b.id}`).join('\n');
+    const v = prompt('选择批次（输入数字）：\n' + opts, BATCHES.findIndex(b=>b.id===cur.batch)+1);
+    if(v === null) return;
+    const n = parseInt(v,10);
+    if(n >= 1 && n <= BATCHES.length){
+      cur.batch = BATCHES[n-1].id;
+      save(); render();
+    }
+  }
+});
+
+/* =========================================================
+   批次选择条
+   ========================================================= */
+function renderBatchBar(){
+  const bar = $('#batchBar');
+  bar.innerHTML = BATCHES.map(b=>
+    `<button class="chip ${b.cls} ${currentBatch===b.id?'active':''}" data-batch="${b.id}">${b.label}</button>`
+  ).join('');
+}
+$('#batchBar').addEventListener('click', e=>{
+  const chip = e.target.closest('.chip');
+  if(!chip) return;
+  currentBatch = chip.dataset.batch;
+  renderBatchBar();
+  save();
+  vibrate();
+  toast('当前批次：' + currentBatch);
+});
+
+/* =========================================================
+   语音识别
+   ========================================================= */
+function initRecog(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){
+    toast('当前浏览器不支持语音识别，请用 Chrome/Edge 或直接打字');
+    return null;
+  }
+  const r = new SR();
+  r.lang = 'zh-CN';
+  r.continuous = true;
+  r.interimResults = true;
+  r.maxAlternatives = 1;
+
+  r.onresult = e => {
+    let interim = '';
+    for(let i=e.resultIndex; i<e.results.length; i++){
+      const res = e.results[i];
+      if(res.isFinal){
+        pendingText += res[0].transcript;
+        clearTimeout(pendingTimer);
+        pendingTimer = setTimeout(flushPending, 2200);
+      } else {
+        interim += res[0].transcript;
+      }
+    }
+    const el = $('#interim');
+    if(interim){
+      el.textContent = '识别中：' + interim;
+      el.classList.add('live');
+    } else if(pendingText){
+      el.textContent = '待归纳：' + pendingText;
+      el.classList.add('live');
+    } else {
+      el.textContent = '聆听中…';
+      el.classList.remove('live');
+    }
+  };
+  r.onerror = ev => {
+    console.warn('语音错误', ev.error);
+    if(ev.error === 'not-allowed') toast('请允许麦克风权限');
+  };
+  r.onend = ()=>{ if(recording){ try{ r.start(); }catch(_){} } };
+  return r;
+}
+
+function flushPending(){
+  const t = pendingText.trim();
+  pendingText = '';
+  const el = $('#interim');
+  el.textContent = recording ? '聆听中…' : '已停止';
+  el.classList.remove('live');
+  if(t){
+    addRecord(t);
+    vibrate(20);
+  }
+}
+
+$('#btnMic').addEventListener('click', ()=>{
+  if(!recog) recog = initRecog();
+  if(!recog) return;
+  try{
+    recog.start();
+    recording = true;
+    $('#btnMic').classList.add('on');
+    $('#btnMic').textContent = '● 录音中…点击停止';
+    $('#btnStop').disabled = false;
+    $('#interim').textContent = '聆听中…';
+    vibrate(30);
+  }catch(e){ console.warn(e); }
+});
+
+$('#btnStop').addEventListener('click', ()=>{
+  recording = false;
+  clearTimeout(pendingTimer);
+  flushPending();
+  if(recog){ try{ recog.stop(); }catch(_){} }
+  $('#btnMic').classList.remove('on');
+  $('#btnMic').textContent = '🎤 点击开始口述';
+  $('#btnStop').disabled = true;
+  vibrate(30);
+});
+
+/* =========================================================
+   手动录入
+   ========================================================= */
+function submitManual(){
+  const v = $('#manualInput').value.trim();
+  if(!v) return;
+  addRecord(v);
+  $('#manualInput').value = '';
+  vibrate(15);
+}
+$('#btnSend').addEventListener('click', submitManual);
+$('#manualInput').addEventListener('keydown', e=>{ if(e.key === 'Enter') submitManual(); });
+$('#recorder').addEventListener('change', save);
+
+/* =========================================================
+   报告生成
+   ========================================================= */
+function mdCell(s){ return String(s).replace(/\|/g,'\\|').replace(/\n/g,' '); }
+
+function buildReport(){
+  const recs = [...records].sort((a,b)=>a.time - b.time);
+  const now = new Date();
+  const L = [];
+
+  L.push('# JK22402 中试生产记录报告');
+  L.push('');
+  L.push('| 项目 | 内容 |');
+  L.push('|---|---|');
+  L.push('| 项目编号 | JK22402 |');
+  L.push('| 产品 / 规格 | 乙酰半胱氨酸片 600mg（理论片重 750mg） |');
+  L.push('| 记录人 | ' + ($('#recorder').value.trim() || '＿＿＿') + ' |');
+  L.push('| 报告生成 | ' + fmtFull(now) + ' |');
+  L.push('| 记录条数 | ' + recs.length + ' 条 |');
+  const batchSet = new Set(recs.map(r=>r.batch));
+  if(batchSet.size) L.push('| 涉及批次 | ' + [...batchSet].join('、') + ' |');
+  L.push('');
+
+  // 一、全局时间轴（跨批次交错）
+  L.push('## 一、全局时间轴（按事件发生时间排序）');
+  L.push('');
+  if(!recs.length){
+    L.push('> 暂无记录。');
+  } else {
+    L.push('| 时间 | 批次 | 工序 | 类别 | 记录内容 |');
+    L.push('|---|---|---|---|---|');
+    recs.forEach(r=>{
+      L.push(`| ${r.dateText} ${r.timeText} | ${r.batch} | ${r.step} | ${r.category} | ${mdCell(r.text)} |`);
+    });
+  }
+  L.push('');
+
+  // 二、批次内时间线
+  L.push('## 二、各批次时间线');
+  L.push('');
+  const byBatch = {};
+  recs.forEach(r=>{
+    if(!byBatch[r.batch]) byBatch[r.batch] = [];
+    byBatch[r.batch].push(r);
+  });
+  Object.keys(byBatch).forEach(b=>{
+    L.push(`### ${b}`);
+    L.push('');
+    L.push('| 时间 | 工序 | 类别 | 记录内容 |');
+    L.push('|---|---|---|---|');
+    byBatch[b].forEach(r=>{
+      L.push(`| ${r.timeText} | ${r.step} | ${r.category} | ${mdCell(r.text)} |`);
+    });
+    L.push('');
+  });
+
+  // 三、批次并行对比（时间分段）
+  L.push('## 三、批次并行时间对比');
+  L.push('');
+  if(Object.keys(byBatch).length >= 2){
+    // 收集所有时间点
+    const allTimes = [...new Set(recs.map(r=>r.dateText + ' ' + r.timeText))].sort();
+    const header = '| 时间 | ' + Object.keys(byBatch).join(' | ') + ' |';
+    const sep = '|---|' + Object.keys(byBatch).map(()=>'---').join('|') + '|';
+    L.push(header);
+    L.push(sep);
+    // 按30分钟粒度聚合
+    const buckets = {};
+    recs.forEach(r=>{
+      const d = new Date(r.time);
+      d.setMinutes(Math.floor(d.getMinutes()/30)*30, 0, 0);
+      const key = fmtHM(d);
+      if(!buckets[key]) buckets[key] = {};
+      if(!buckets[key][r.batch]) buckets[key][r.batch] = [];
+      buckets[key][r.batch].push(r.step);
+    });
+    Object.keys(buckets).sort().forEach(k=>{
+      const row = [k];
+      Object.keys(byBatch).forEach(b=>{
+        const steps = buckets[k][b];
+        row.push(steps ? [...new Set(steps)].join('、') : '');
+      });
+      L.push('| ' + row.join(' | ') + ' |');
+    });
+    L.push('');
+  } else {
+    L.push('（仅一个批次，无需并行对比）');
+    L.push('');
+  }
+
+  // 四、偏差/异常
+  const abn = recs.filter(r=>r.category === '偏差/异常');
+  L.push('## 四、偏差 / 异常汇总');
+  L.push('');
+  if(!abn.length){
+    L.push('本次记录未发现偏差或异常项。');
+  } else {
+    abn.forEach((r,i)=>{
+      L.push(`${i+1}. **${r.timeText}｜${r.batch}｜${r.step}**：${r.text}`);
+      L.push(`   - 建议：按《偏差处理管理规程》评估影响，必要时填写偏差处理单并取样确认。`);
+    });
+  }
+  L.push('');
+
+  // 五、参数符合性
+  const withParams = recs.filter(r=>r.params.length);
+  L.push('## 五、关键工艺参数符合性检查');
+  L.push('');
+  if(!withParams.length){
+    L.push('本次记录未提取到工艺参数。');
+  } else {
+    L.push('| 时间 | 批次 | 工序 | 参数 | 记录值 | 方案范围 | 判定 |');
+    L.push('|---|---|---|---|---|---|---|');
+    let over = 0;
+    withParams.forEach(r=>{
+      r.params.forEach(p=>{
+        if(!p.ok) over++;
+        L.push(`| ${r.timeText} | ${r.batch} | ${r.step} | ${p.key} | ${p.value}${p.unit} | ${p.range} | ${p.ok?'符合':'⚠超范围'} |`);
+      });
+    });
+    L.push('');
+    L.push(over ? `> ⚠ 共 **${over}** 项参数超出方案设定范围，请核实是否需启动偏差处理。`
+                : '> 所有已记录参数均在方案设定范围内。');
+  }
+  L.push('');
+
+  // 六、取样/检测
+  const smp = recs.filter(r=>r.category === '取样/检测');
+  L.push('## 六、取样 / 检测记录');
+  L.push('');
+  if(!smp.length){
+    L.push('本次记录未包含取样或检测信息。');
+  } else {
+    smp.forEach(r=>L.push(`- ${r.timeText}｜${r.batch}｜${r.step}：${r.text}`));
+  }
+  L.push('');
+
+  // 七、工序覆盖
+  L.push('## 七、工序记录覆盖检查');
+  L.push('');
+  L.push('| 工序 | 记录条数 |');
+  L.push('|---|---|');
+  STEPS.forEach(s=>{
+    const n = recs.filter(r=>r.step === s.name).length;
+    L.push(`| ${s.name} | ${n || '—'} |`);
+  });
+  L.push('');
+
+  // 八、原始记录
+  L.push('## 八、原始口述记录（按时间）');
+  L.push('');
+  if(!recs.length) L.push('（无）');
+  else recs.forEach(r=>L.push(`- ${fmtFull(r.time)}　【${r.batch}】【${r.step}】${r.text}`));
+  L.push('');
+  L.push('---');
+  L.push('');
+  L.push('> 本报告由语音速记自动归纳生成，作为现场记录整理底稿；正式数据以批生产记录、批检验记录及偏差处理单为准。');
+
+  return L.join('\n');
+}
+
+/* =========================================================
+   报告弹层
+   ========================================================= */
+$('#btnFab').addEventListener('click', ()=>{
+  $('#report').textContent = buildReport();
+  $('#reportModal').classList.add('show');
+});
+$('#btnCloseModal').addEventListener('click', ()=>{
+  $('#reportModal').classList.remove('show');
+});
+$('#btnCopy').addEventListener('click', async ()=>{
+  const txt = $('#report').textContent;
+  try{
+    await navigator.clipboard.writeText(txt);
+    toast('已复制到剪贴板');
+  }catch(_){
+    const ta = document.createElement('textarea');
+    ta.value = txt; ta.style.position='fixed'; ta.style.left='-9999px';
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); toast('已复制'); }catch(e){ toast('复制失败'); }
+    ta.remove();
+  }
+});
+$('#btnDownload').addEventListener('click', ()=>{
+  const txt = $('#report').textContent;
+  const blob = new Blob([txt], {type:'text/markdown;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'JK22402_记录报告_' + fmtYMD(new Date()).replace(/[.\-]/g,'') + '_' +
+               fmtHM(new Date()).replace(':','') + '.md';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('已下载');
+});
+
+/* =========================================================
+   启动
+   ========================================================= */
+load();
+renderBatchBar();
+render();
+
+// 防止手机键盘遮挡输入框
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize', ()=>{
+    document.body.style.height = window.visualViewport.height + 'px';
+  });
+}
+
+window.addEventListener('beforeunload', save);
+</script>
+</body>
+</html>
